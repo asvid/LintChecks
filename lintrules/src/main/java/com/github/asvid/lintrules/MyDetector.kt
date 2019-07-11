@@ -1,35 +1,46 @@
 package com.github.asvid.lintrules
 
-import com.android.tools.lint.detector.api.Context
+import com.android.tools.lint.client.api.UElementHandler
 import com.android.tools.lint.detector.api.Detector
-import com.android.tools.lint.detector.api.Location
-import com.android.tools.lint.detector.api.XmlContext
-import org.jetbrains.uast.UClass
-import org.w3c.dom.Document
-import java.util.regex.Pattern
+import com.android.tools.lint.detector.api.JavaContext
+import org.jetbrains.uast.UFile
 
-private val importPattern = Pattern.compile("(import).*(\\.internal\\.).*")
-private val packagePattern = Pattern.compile("(package).*(\\.internal\\.).*")
 
-class MyDetector : Detector(), Detector.UastScanner {
+class MyDetector : Detector(), Detector.UastScanner, Detector.ClassScanner {
 
-    override fun getApplicableUastTypes() = listOf(UClass::class.java)
+    override fun getApplicableUastTypes() = listOf(UFile::class.java)
 
-    override fun visitDocument(context: XmlContext, document: Document) {
-        // Needs to be overridden but we we'll do the work in afterCheckFile.
-    }
+    override fun createUastHandler(context: JavaContext): UElementHandler? {
+        return object : UElementHandler() {
+            override fun visitFile(node: UFile) {
+                val imports = node.imports
+                val packageName = node.packageName
 
-    override fun afterCheckFile(context: Context) {
-        val source = context.getContents().toString()
-        val matcher = importPattern.matcher(source)
-        val packagePattern = packagePattern.matcher(source)
 
-        while (matcher.find() && !packagePattern.find()) {
-            val start = matcher.start()
-            val end = matcher.end()
+                val containsInternal = imports.any {
+                    it.importReference?.asRenderString()?.contains("internal") ?: false
+                }
 
-            val location = Location.create(context.file, source, start, end)
-            context.report(MyIssue.getIssue(), location, "Contains internal import.")
+                if (packageName.contains("external") && containsInternal) {
+                    println("LINT: $packageName")
+
+                    imports.forEach {
+                        println("import: ${it.importReference?.asRenderString()}")
+                    }
+
+                    val fix = fix()
+                        .replace()
+                        .build()
+
+                    context.report(
+                        MyIssue.getIssue(),
+                        node,
+                        context.getLocation(node),
+                        "Contains internal import.",
+                        fix
+                    )
+                }
+            }
         }
     }
 }

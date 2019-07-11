@@ -1,7 +1,6 @@
 package com.github.asvid.lintrules
 
 import com.android.tools.lint.detector.api.*
-import java.util.*
 
 object MyIssue {
 
@@ -22,8 +21,7 @@ object MyIssue {
         SEVERITY,
         Implementation(
             MyDetector::class.java,
-            EnumSet.of(Scope.JAVA_FILE, Scope.TEST_SOURCES)
+            Scope.JAVA_FILE_SCOPE
         )
     )
-
 }
